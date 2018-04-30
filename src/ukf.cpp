@@ -7,6 +7,8 @@ using Eigen::MatrixXd;
 using Eigen::VectorXd;
 using std::vector;
 
+  MatrixXd Xsig_pred;
+
 /**
  * Initializes Unscented Kalman filter
  * This is scaffolding, do not modify
@@ -172,7 +174,8 @@ void UKF::Prediction(double delta_t) {
 
   /////////////////////////////////
 
-  MatrixXd Xsig_pred = MatrixXd(n_x, 2 * n_aug + 1);
+  //MatrixXd Xsig_pred = MatrixXd(n_x, 2 * n_aug + 1);
+  Xsig_pred = MatrixXd(n_x, 2 * n_aug + 1);
 
   VectorXd weights = VectorXd(2*n_aug+1);
 
@@ -337,6 +340,8 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
  * @param {MeasurementPackage} meas_package
  */
 void UKF::UpdateRadar(MeasurementPackage meas_package) {
+ MatrixXd z = meas_package.raw_measurements_;
+
     //UpdateRadar(meas_package.raw_measurements_);
 
   /**
@@ -347,6 +352,104 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   You'll also need to calculate the radar NIS.
   */
+
+
+  //26. XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+  int n_x = 5;
+
+  int n_aug = 7;
+
+  int n_z = 3;
+
+  double lambda = 3 - n_aug;
+
+  //std_radr_ = 0.3;
+  //std_radphi_ = 0.03;
+  //std_radrd_ = 0.3;
+
+  VectorXd weights = VectorXd(2*n_aug+1);
+ 
+  int i=0;
+  weights(0)= lambda / (lambda+n_aug);
+  for(i=1;i< (2*n_aug+1) ; i++) weights(i) = 1/(2*(lambda+n_aug)) ;
+
+
+ //create matrix for sigma points in measurement space
+  MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug + 1);
+
+  //mean predicted measurement
+  VectorXd z_pred = VectorXd(n_z);
+  
+  //measurement covariance matrix S
+  MatrixXd S = MatrixXd(n_z,n_z);
+
+  //transform sigma points into measurement space
+  for(int i=0; i < 2*n_aug+1 ; i++)
+  {
+      VectorXd x = Xsig_pred.col(i);
+    float px = x(0);
+    float py = x(1);
+    float v = x(2);
+    float psi = x(3);
+    float psi_ = x(4);
+    
+    float rho = sqrt(px*px + py*py);
+    float pi = atan2(py,px);
+    float rho_ = (px*cos(psi)*v + py*sin(psi)*v)/sqrt(px*px + py*py) ;
+    
+    Zsig.col(i) << rho,pi,rho_;
+  }
+  
+  //calculate mean predicted measurement
+  z_pred.fill(0.0);
+  for(int i=0; i < 2*n_aug+1; i++)
+  {
+     z_pred += weights(i) * Zsig.col(i);
+  }
+  
+  //calculate innovation covariance matrix S
+  S.fill(0.0);
+  MatrixXd R  = MatrixXd(3,3);
+  R.fill(0.0);
+  R(0,0) = std_radr_*std_radr_;
+  R(1,1) = std_radphi_*std_radphi_;
+  R(2,2) = std_radrd_*std_radrd_;
+  
+  
+  
+  for(int i=0; i < 2*n_aug+1 ; i++)
+  {
+      VectorXd diff = Zsig.col(i) - z_pred;
+      S  += weights(i) * diff * diff.transpose() ;
+  }
+  S += R;
+
+
+  //30. XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+  //calculate cross correlation matrix
+  MatrixXd Tc = MatrixXd(n_x, n_z);
+  Tc.fill(0.0);
+  for(int i=0; i< n_aug*2+1 ; i++)
+  {
+      VectorXd xdiff = Xsig_pred.col(i) - x_;
+      while( xdiff(1) > 3.14)   xdiff(1) -= 2*3.14;
+      while( xdiff(1) < -3.14)   xdiff(1) += 2*3.14;
+      
+
+      VectorXd zdiff = Zsig.col(i) - z_pred;
+      while( zdiff(1) > 3.14)   zdiff(1) -= 2*3.14;
+      while( zdiff(1) > 3.14)   zdiff(1) -= 2*3.14;      
+      
+      //Tc += weights(i) * (Xsig_pred.col(i) - x) *
+      //              (Zsig.col(i) - z_pred).transpose();
+      Tc += weights(i) * xdiff * zdiff.transpose();
+  }
+  //calculate Kalman gain K;
+  MatrixXd K = Tc * S.inverse();
+  //update state mean and covariance matrix
+  
+  x_  = x_ + K*(z - z_pred);
+  P_ = P_ - K*S*K.transpose();
 }
 
 //XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
