@@ -89,7 +89,6 @@ UKF::~UKF() {}
  */
 void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 printf("XXXXXXXXXXXXX ProcessMeasurement\n");
-return;
   /**
   TODO:
 
