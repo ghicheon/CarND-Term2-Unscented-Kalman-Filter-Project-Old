@@ -16,7 +16,7 @@ UKF::UKF() {
   use_laser_ = true;
 
   // if this is false, radar measurements will be ignored (except during init)
-  use_radar_ = true;
+//  use_radar_ = true;
 
   // initial state vector
   x_ = VectorXd(5);
@@ -103,6 +103,7 @@ printf("XXXXXXXXXXXXX ProcessMeasurement\n");
    //   x_  << 1,1,0.1,0.1,0.1;  //XXX
      
       if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+          
           //Convert radar from polar to cartesian coordinates and initialize state.
           float rho     = meas_package.raw_measurements_[0];
           float phi     = meas_package.raw_measurements_[1];
@@ -178,6 +179,7 @@ void UKF::Prediction(double delta_t) {
  
   int i=0;
 
+printf("Predict x1");
   weights_(0)= lambda_ / (lambda_+n_aug_);
   for(i=1;i< (2*n_aug_+1) ; i++) weights_(i) = 1/(2*(lambda_+n_aug_)) ;
 
@@ -217,6 +219,7 @@ void UKF::Prediction(double delta_t) {
   Xsig_aug.col(0) = x_aug;
   
   MatrixXd xxx = MatrixXd(7,7);
+printf("Predict x2");
   
   for(int i=0; i<7;i++)
   {
@@ -230,6 +233,7 @@ void UKF::Prediction(double delta_t) {
   //PPP 2 /////////////////////////////////////////////////////////////////////////////// 
 
 
+printf("Predict x3");
   //predict sigma points
   //avoid division by zero
   //write predicted sigma points into right column
@@ -254,6 +258,7 @@ void UKF::Prediction(double delta_t) {
            u = Xsig_aug(5,i);
            u__ = Xsig_aug(6,i);
            
+printf("Predict x4");
            if( s_ == 0)
            {
                Xsig_pred_(0,i)=x + v*cos(s)*t   + 1/2.0 * t*t * cos(s) * u;
@@ -276,6 +281,7 @@ void UKF::Prediction(double delta_t) {
   //predict state mean
   //predict state covariance matrix
   
+printf("Predict x5");
   VectorXd x_temp = VectorXd(n_x_);
   
   x_temp.fill(0);
@@ -284,17 +290,24 @@ void UKF::Prediction(double delta_t) {
       x_temp += weights_(i) * Xsig_pred_.col(i);
   }
 
-  VectorXd P_temp = MatrixXd(5, 5);
+printf("Predict x6");
+  MatrixXd P_temp = MatrixXd(5, 5);
+printf("Predict x60");
   P_temp.fill(0);
+printf("Predict x61");
   for(i=0;i<(n_aug_*2+1) ; i++)
   {
       VectorXd diff = Xsig_pred_.col(i) - x_temp ;
+printf("Predict x62");
       while( diff(3) < -3.14) diff(3) += 2*3.14;
+printf("Predict x63");
       while( diff(3) > 3.14)  diff(3) -= 2*3.14;
+printf("Predict x64");
       
       P_temp += weights_(i) * diff * diff.transpose();
   }
 
+printf("Predict x7");
   x_ = x_temp;
   P_ = P_temp;
   
@@ -319,9 +332,8 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
  MatrixXd  H_ = MatrixXd(2, 5);
 
-  R_ << 0.09, 0, 0,
-        0, 0.0009, 0,
-        0, 0, 0.09;
+  R_ << 0.0225, 0,
+        0, 0.0225;
 
    H_     << 1,0,0,0,0,
              0,1,0,0,0;
@@ -586,9 +598,13 @@ FusionEKF::~FusionEKF() {}
 
 
 void FusionEKF::ProcessMeasurement(const MeasurementPackage &meas_package) {
-  /*****************************************************************************
-   *  Initialization
-   ****************************************************************************/
+
+    if( use_laser_ == false && meas_package.sensor_type_ == MeasurementPackage::LIDAR)
+        return ;
+
+    if( use_radar_ == false && meas_package.sensor_type_ == MeasurementPackage::RADAR)
+        return ;
+
   if (!is_initialized_) {
     /**
     TODO:
